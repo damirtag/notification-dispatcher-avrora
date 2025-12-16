@@ -21,7 +21,7 @@ export class NotificationWorker implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.startConsumer();
+    this.startConsumer();
   }
 
   private async startConsumer(): Promise<void> {
