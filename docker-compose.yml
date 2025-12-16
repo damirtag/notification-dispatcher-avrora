@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: notification_dispatcher_db
+    environment:
+      POSTGRES_USER: notifuser
+      POSTGRES_PASSWORD: notifpass
+      POSTGRES_DB: notifdb
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U notifuser']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: notification_dispatcher_redis
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: notification_dispatcher_nats
+    command: ['-js', '-m', '8222']
+    ports:
+      - '4222:4222'
+      - '8222:8222'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:8222/healthz']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notification_dispatcher_api
+    environment:
+      NODE_ENV: production
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: notifuser
+      DATABASE_PASSWORD: notifpass
+      DATABASE_NAME: notifdb
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NATS_URL: nats://nats:4222
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
